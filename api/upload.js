@@ -1,4 +1,4 @@
-const ImageKit = require("imagekit");
+import ImageKit from "imagekit";
 
 const imagekit = new ImageKit({
   publicKey: process.env.VITE_IMAGEKIT_PUBLIC_KEY,
@@ -14,7 +14,7 @@ export const config = {
   },
 };
 
-module.exports = async (req, res) => {
+export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
@@ -27,7 +27,7 @@ module.exports = async (req, res) => {
     }
 
     const uploadResponse = await imagekit.upload({
-      file: file, // Base64 string
+      file: file,
       fileName: fileName,
       folder: "/blueberry",
     });
@@ -35,6 +35,6 @@ module.exports = async (req, res) => {
     res.status(200).json(uploadResponse);
   } catch (error) {
     console.error("Upload Error:", error);
-    res.status(500).json({ error: "Failed to upload to ImageKit" });
+    res.status(500).json({ error: "Failed to upload to ImageKit", details: error.message });
   }
-};
+}

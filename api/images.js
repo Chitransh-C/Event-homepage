@@ -1,4 +1,4 @@
-const ImageKit = require("imagekit");
+import ImageKit from "imagekit";
 
 const imagekit = new ImageKit({
   publicKey: process.env.VITE_IMAGEKIT_PUBLIC_KEY,
@@ -6,25 +6,24 @@ const imagekit = new ImageKit({
   urlEndpoint: process.env.VITE_IMAGEKIT_URL_ENDPOINT,
 });
 
-module.exports = async (req, res) => {
+export default async function handler(req, res) {
   try {
     const files = await imagekit.listFiles({
-      path: "/blueberry", // The folder name you created in ImageKit
+      path: "/blueberry",
       limit: 50,
     });
 
-    // Map ImageKit response to our gallery format
     const formattedFiles = files.map((file) => ({
       id: file.fileId,
-      title: file.name.split(".")[0].replace(/-/g, " "), // Use filename as title
+      title: file.name.split(".")[0].replace(/-/g, " "),
       category: "Archive",
       image: file.url,
-      span: "", // Default span
+      span: "",
     }));
 
     res.status(200).json(formattedFiles);
   } catch (error) {
     console.error("ImageKit Error:", error);
-    res.status(500).json({ error: "Failed to fetch images" });
+    res.status(500).json({ error: "Failed to fetch images", details: error.message });
   }
-};
+}
