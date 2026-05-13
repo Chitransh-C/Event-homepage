@@ -27,11 +27,32 @@ const galleryItems = [
 
 export default function Gallery() {
   const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const customItems = JSON.parse(localStorage.getItem("gallery_custom_items") || "[]");
-    setItems([...galleryItems, ...customItems]);
+    const fetchImages = async () => {
+      try {
+        const response = await fetch('/api/images');
+        const dynamicItems = await response.json();
+        
+        // Merge static items with dynamic ones
+        setItems([...galleryItems, ...dynamicItems]);
+      } catch (error) {
+        console.error("Fetch error:", error);
+        setItems(galleryItems); // Fallback to static
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchImages();
   }, []);
+
+  if (loading) return (
+    <div className="min-h-screen flex items-center justify-center bg-brand-midnight">
+      <div className="w-12 h-12 border-2 border-brand-gold border-t-transparent rounded-full animate-spin" />
+    </div>
+  );
 
   return (
     <div className="min-h-screen bg-transparent pt-32 pb-20">

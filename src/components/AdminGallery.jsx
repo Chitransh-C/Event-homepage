@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Lock, Upload, Trash2, Plus, LogOut } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { Lock, Upload, Trash2, Plus, LogOut, Loader2, CheckCircle2 } from 'lucide-react';
+import { useNavigate, Link } from 'react-router-dom';
 
 const ADMIN_PASSWORD = import.meta.env.VITE_ADMIN_PASSWORD;
 
@@ -10,16 +10,26 @@ export default function AdminGallery() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [items, setItems] = useState([]);
-  const [newItem, setNewItem] = useState({ title: "", category: "", image: "", span: "" });
+  const [uploading, setUploading] = useState(false);
+  const [uploadSuccess, setUploadSuccess] = useState(false);
+  const [selectedFile, setSelectedFile] = useState(null);
   const navigate = useNavigate();
 
   useEffect(() => {
     const auth = localStorage.getItem("blueberry_admin_auth");
     if (auth === "true") setIsAuthenticated(true);
-    
-    const savedItems = JSON.parse(localStorage.getItem("gallery_custom_items") || "[]");
-    setItems(savedItems);
+    fetchLiveItems();
   }, []);
+
+  const fetchLiveItems = async () => {
+    try {
+      const res = await fetch('/api/images');
+      const data = await res.json();
+      setItems(data);
+    } catch (err) {
+      console.error("Failed to fetch items");
+    }
+  };
 
   const handleLogin = (e) => {
     e.preventDefault();
@@ -38,19 +48,50 @@ export default function AdminGallery() {
     navigate("/");
   };
 
-  const addItem = (e) => {
-    e.preventDefault();
-    if (!newItem.title || !newItem.image) return;
-    const updated = [...items, { ...newItem, id: Date.now() }];
-    setItems(updated);
-    localStorage.setItem("gallery_custom_items", JSON.stringify(updated));
-    setNewItem({ title: "", category: "", image: "", span: "" });
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setSelectedFile(file);
+    }
   };
 
-  const deleteItem = (id) => {
-    const updated = items.filter(item => item.id !== id);
-    setItems(updated);
-    localStorage.setItem("gallery_custom_items", JSON.stringify(updated));
+  const uploadFile = async (e) => {
+    e.preventDefault();
+    if (!selectedFile) return;
+
+    setUploading(true);
+    setError("");
+
+    try {
+      // Convert file to base64
+      const reader = new FileReader();
+      reader.readAsDataURL(selectedFile);
+      reader.onload = async () => {
+        const base64Data = reader.result;
+        
+        const response = await fetch('/api/upload', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            file: base64Data,
+            fileName: selectedFile.name,
+          }),
+        });
+
+        if (response.ok) {
+          setUploadSuccess(true);
+          setSelectedFile(null);
+          fetchLiveItems();
+          setTimeout(() => setUploadSuccess(false), 3000);
+        } else {
+          setError("Upload failed. Check your credentials.");
+        }
+        setUploading(false);
+      };
+    } catch (err) {
+      setError("Error processing file.");
+      setUploading(false);
+    }
   };
 
   if (!isAuthenticated) {
@@ -90,8 +131,9 @@ export default function AdminGallery() {
       <div className="container mx-auto px-6">
         <div className="flex justify-between items-end mb-20">
           <div>
-            <h1 className="text-4xl md:text-6xl font-serif text-brand-ivory mb-4">Curate Archive</h1>
-            <p className="text-brand-gold text-[10px] uppercase tracking-[0.4em]">Manage ImageKit assets</p>
+            <Link to="/" className="text-brand-gold text-[10px] uppercase tracking-[0.4em] mb-4 block hover:text-brand-ivory transition-colors">← Back to Journey</Link>
+            <h1 className="text-4xl md:text-6xl font-serif text-brand-ivory mb-4">Royal Uploader</h1>
+            <p className="text-brand-gold text-[10px] uppercase tracking-[0.4em]">Direct to ImageKit Archive</p>
           </div>
           <button 
             onClick={handleLogout}
@@ -102,84 +144,83 @@ export default function AdminGallery() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
-          {/* Add Form */}
+          {/* Upload Form */}
           <div className="lg:col-span-1">
-            <form onSubmit={addItem} className="glass p-8 space-y-8 sticky top-32">
+            <div className="glass p-8 space-y-8 sticky top-32">
               <h2 className="text-xl font-serif text-brand-ivory flex items-center">
-                <Plus className="w-5 h-5 mr-3 text-brand-gold" /> Add New Project
+                <Upload className="w-5 h-5 mr-3 text-brand-gold" /> Instant Upload
               </h2>
+              
               <div className="space-y-6">
-                <div>
-                  <label className="text-[10px] uppercase tracking-[0.3em] text-brand-gold/60 block mb-2">Project Title</label>
+                <div className="relative group">
                   <input 
-                    type="text" 
-                    value={newItem.title}
-                    onChange={(e) => setNewItem({...newItem, title: e.target.value})}
-                    className="w-full bg-transparent border-b border-brand-ivory/10 py-2 text-brand-ivory focus:border-brand-gold outline-none"
-                    placeholder="Ex. Royal Rajasthan"
+                    type="file" 
+                    onChange={handleFileChange}
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                    accept="image/*"
                   />
+                  <div className="border-2 border-dashed border-brand-gold/20 rounded-xl p-10 text-center group-hover:border-brand-gold/50 transition-colors">
+                    <Plus className="w-8 h-8 text-brand-gold/40 mx-auto mb-4 group-hover:scale-110 transition-transform" />
+                    <p className="text-brand-ivory/60 text-xs uppercase tracking-widest leading-relaxed">
+                      {selectedFile ? selectedFile.name : "Select or Drop Image"}
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <label className="text-[10px] uppercase tracking-[0.3em] text-brand-gold/60 block mb-2">Category</label>
-                  <input 
-                    type="text" 
-                    value={newItem.category}
-                    onChange={(e) => setNewItem({...newItem, category: e.target.value})}
-                    className="w-full bg-transparent border-b border-brand-ivory/10 py-2 text-brand-ivory focus:border-brand-gold outline-none"
-                    placeholder="Ex. Palace Wedding"
-                  />
-                </div>
-                <div>
-                  <label className="text-[10px] uppercase tracking-[0.3em] text-brand-gold/60 block mb-2">ImageKit URL</label>
-                  <input 
-                    type="text" 
-                    value={newItem.image}
-                    onChange={(e) => setNewItem({...newItem, image: e.target.value})}
-                    className="w-full bg-transparent border-b border-brand-ivory/10 py-2 text-brand-ivory focus:border-brand-gold outline-none"
-                    placeholder="https://ik.imagekit.io/..."
-                  />
-                </div>
-                <div>
-                  <label className="text-[10px] uppercase tracking-[0.3em] text-brand-gold/60 block mb-2">Layout Size</label>
-                  <select 
-                    value={newItem.span}
-                    onChange={(e) => setNewItem({...newItem, span: e.target.value})}
-                    className="w-full bg-brand-midnight border border-brand-ivory/10 py-3 text-brand-ivory focus:border-brand-gold outline-none px-2"
-                  >
-                    <option value="">Normal (1x1)</option>
-                    <option value="md:col-span-2">Wide (2x1)</option>
-                    <option value="md:col-span-2 md:row-span-2">Large (2x2)</option>
-                  </select>
-                </div>
+
+                <AnimatePresence>
+                  {uploadSuccess && (
+                    <motion.div 
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0 }}
+                      className="bg-green-500/10 border border-green-500/20 text-green-400 p-4 rounded-lg flex items-center text-xs tracking-widest uppercase"
+                    >
+                      <CheckCircle2 className="w-4 h-4 mr-3" /> Successfully Uploaded
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
+                {error && <p className="text-red-400 text-[10px] uppercase tracking-widest">{error}</p>}
+
+                <button 
+                  onClick={uploadFile}
+                  disabled={!selectedFile || uploading}
+                  className={`w-full py-5 rounded-lg flex items-center justify-center uppercase tracking-[0.3em] text-[10px] font-bold transition-all duration-500 ${
+                    !selectedFile || uploading 
+                    ? 'bg-white/5 text-white/20 cursor-not-allowed' 
+                    : 'bg-brand-gold text-brand-midnight hover:bg-brand-ivory shadow-xl shadow-brand-gold/10'
+                  }`}
+                >
+                  {uploading ? <Loader2 className="w-5 h-5 animate-spin" /> : "Initiate Upload"}
+                </button>
               </div>
-              <button className="w-full py-4 bg-brand-gold/10 border border-brand-gold/30 text-brand-gold uppercase tracking-[0.2em] font-bold hover:bg-brand-gold hover:text-brand-midnight transition-all duration-500">
-                Update Gallery
-              </button>
-            </form>
+
+              <div className="pt-4 border-t border-brand-ivory/5">
+                <p className="text-[9px] text-brand-ivory/40 leading-relaxed uppercase tracking-widest">
+                  Images will be automatically optimized to .webp and added to the "/blueberry" folder.
+                </p>
+              </div>
+            </div>
           </div>
 
           {/* List View */}
           <div className="lg:col-span-2 space-y-6">
-            <h2 className="text-xl font-serif text-brand-ivory">Live Items ({items.length})</h2>
+            <h2 className="text-xl font-serif text-brand-ivory">Live Archive ({items.length})</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {items.map((item) => (
-                <div key={item.id} className="glass p-4 flex items-center group">
-                  <img src={item.image} alt="" className="w-16 h-16 object-cover rounded border border-brand-gold/20" />
-                  <div className="ml-4 flex-1">
-                    <h4 className="text-brand-ivory text-sm font-medium">{item.title}</h4>
-                    <p className="text-brand-gold/60 text-[9px] uppercase tracking-widest">{item.category}</p>
+                <div key={item.id} className="glass p-4 flex items-center group overflow-hidden">
+                  <div className="w-20 h-20 overflow-hidden rounded">
+                    <img src={item.image} alt="" className="w-full h-full object-cover border border-brand-gold/10 group-hover:scale-110 transition-transform duration-700" />
                   </div>
-                  <button 
-                    onClick={() => deleteItem(item.id)}
-                    className="p-2 text-brand-ivory/20 hover:text-red-400 transition-colors"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                  <div className="ml-6 flex-1 min-w-0">
+                    <h4 className="text-brand-ivory text-xs font-medium uppercase tracking-widest truncate">{item.title}</h4>
+                    <p className="text-brand-gold/40 text-[9px] uppercase tracking-widest mt-1">ImageKit Optimization Active</p>
+                  </div>
                 </div>
               ))}
               {items.length === 0 && (
                 <div className="col-span-full py-20 text-center border border-dashed border-brand-ivory/10 rounded-lg">
-                  <p className="text-brand-ivory/20 text-xs uppercase tracking-[0.3em]">No custom assets added yet</p>
+                  <p className="text-brand-ivory/20 text-xs uppercase tracking-[0.3em]">No assets in archive</p>
                 </div>
               )}
             </div>
